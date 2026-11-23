@@ -64,6 +64,27 @@ def test_from_file_path_guess_mime_type(file_path, expected_mime_types, tmp_path
     assert b.mime_type in expected_mime_types
 
 
+def test_guessed_mime_type_does_not_depend_on_the_platform_database(tmp_path):
+    """A standard extension resolves through the built-in table, not the machine.
+
+    Windows registers `.csv` as Excel and answers `application/vnd.ms-excel`, which is
+    not the IANA type components such as FileTypeRouter match on.
+    """
+    csv_file = tmp_path / "spam.csv"
+    csv_file.touch()
+
+    assert ByteStream.from_file_path(csv_file, guess_mime_type=True).mime_type == "text/csv"
+
+
+def test_guessed_mime_type_falls_back_for_an_extension_the_builtin_table_lacks(tmp_path):
+    # `.xlsx` lives only in the platform/OS database, so the fallback has to keep working.
+    xlsx_file = tmp_path / "spam.xlsx"
+    xlsx_file.touch()
+
+    guessed = ByteStream.from_file_path(xlsx_file, guess_mime_type=True).mime_type
+    assert guessed == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
 def test_explicit_mime_type_is_not_overwritten_by_guessing(tmp_path):
     # create empty file with correct extension
     test_file = tmp_path / "sample.md"
