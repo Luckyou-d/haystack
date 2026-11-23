@@ -18,6 +18,10 @@ from haystack import logging
 if TYPE_CHECKING:
     from haystack.dataclasses import Document
 
+# Built-in table only: unlike `mimetypes.guess_type`, it does not read the platform
+# database, so the answer for a standard extension does not depend on the machine.
+_MIME_TYPES = mimetypes.MimeTypes()
+
 CUSTOM_MIMETYPES = {
     # we add markdown because it is not added by the mimetypes module
     # see https://github.com/python/cpython/pull/17995
@@ -115,7 +119,12 @@ def _guess_mime_type(path: Path) -> str | None:
     :returns: The MIME type of the provided file path, or `None` if the MIME type cannot be determined.
     """
     extension = path.suffix.lower()
-    mime_type = mimetypes.guess_type(path.as_posix())[0]
+    # Prefer the built-in table over the platform database. The same file otherwise gets
+    # a different type on each system - Windows registers `.csv` as Excel and answers
+    # `application/vnd.ms-excel` - so components keyed on IANA types (FileTypeRouter,
+    # the converters) stopped matching on Windows. Fall back to the platform database
+    # for the extensions the built-in table does not carry, such as `.xlsx`.
+    mime_type = _MIME_TYPES.guess_type(path.as_posix())[0] or mimetypes.guess_type(path.as_posix())[0]
     # lookup custom mappings if the mime type is not found
     return CUSTOM_MIMETYPES.get(extension, mime_type)
 
